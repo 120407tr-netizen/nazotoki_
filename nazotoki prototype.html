@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>謎解き 共有ボード【テスト】</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night0:#070b18; --night1:#0e1630; --panel:#121c38; --panel2:#0d1730;
+    --gold:#e9c46a; --gold1:#f4d67a; --gold2:#c99a2f;
+    --paper:#f2ecdb; --muted:#93a0bd; --line:#26314f;
+    --ok:#7bc47f; --himawari:#e0a815;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--night0);}
+  body{
+    font-family:"Zen Kaku Gothic New","Noto Sans CJK JP",sans-serif;color:var(--paper);
+    -webkit-font-smoothing:antialiased;min-height:100dvh;
+    background:radial-gradient(120% 60% at 50% -10%,#16204a 0%,#0a1024 46%,#070b18 84%);
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:20px 16px 60px;}
+
+  /* ヘッダー */
+  header{text-align:center;padding:16px 0 6px;position:relative;}
+  header .en{font-family:"Shippori Mincho",serif;letter-spacing:.5em;font-size:11px;color:var(--gold1);margin-left:.5em}
+  header h1{font-family:"Shippori Mincho","Noto Serif CJK JP",serif;font-weight:800;font-size:26px;letter-spacing:.14em;color:#fff;margin-top:6px}
+  header .sub{font-size:12px;color:var(--muted);margin-top:6px;letter-spacing:.2em}
+
+  /* 接続状態 */
+  .status{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px auto 4px;font-size:12px;color:var(--muted)}
+  .status .dot{width:8px;height:8px;border-radius:50%;background:#c0563e;box-shadow:0 0 6px #c0563e}
+  .status.online .dot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  .status.local .dot{background:var(--gold1);box-shadow:0 0 6px var(--gold1)}
+
+  /* 名前入力 */
+  .whoami{display:flex;gap:8px;align-items:center;justify-content:center;margin:10px 0 20px}
+  .whoami input{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:#fff;
+    padding:8px 12px;font-size:14px;width:180px;font-family:inherit}
+  .whoami label{font-size:12px;color:var(--muted)}
+  .whoami #color{width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
+
+  /* ツールバー */
+  .toolbar{display:flex;align-items:center;justify-content:center;gap:6px;margin:-6px 0 16px}
+  .toolbar .tb-label{font-size:11px;color:var(--muted);margin-right:2px}
+  .tb-btn{background:var(--panel);border:1px solid var(--line);border-radius:7px;color:var(--paper);
+    font-size:12px;padding:4px 12px;cursor:pointer;font-family:inherit}
+  .tb-btn.on{border-color:var(--gold2);color:var(--gold1);background:rgba(201,154,47,.12)}
+
+  /* 参加者リスト */
+  .participants{background:rgba(18,28,56,.6);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;margin-bottom:16px;font-size:12px}
+  .participants .p-title{color:var(--gold1);font-weight:700;margin-right:8px}
+  .p-list{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle}
+  .p-chip{display:inline-flex;align-items:center;gap:5px;background:#0b1226;border:1px solid var(--line);
+    border-radius:20px;padding:2px 10px}
+  .p-chip .pdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .p-none{color:var(--muted)}
+
+  /* 進捗バー */
+  .progress-wrap{margin-bottom:14px}
+  .progress-bar{height:12px;background:#0b1226;border:1px solid var(--line);border-radius:20px;overflow:hidden}
+  .progress-fill{height:100%;width:0;border-radius:20px;
+    background:linear-gradient(90deg,var(--gold2),var(--gold1),var(--himawari));transition:width .5s ease}
+  .progress-txt{font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
+
+  /* 文字サイズ(全体を拡大縮小。固定pxにも効く) */
+  body.fs-small .wrap{zoom:0.88}
+  body.fs-normal .wrap{zoom:1}
+  body.fs-large .wrap{zoom:1.15}
+  /* zoom非対応ブラウザ用のフォールバック */
+  @supports not (zoom:1){
+    body.fs-small .wrap{transform:scale(0.88);transform-origin:top center}
+    body.fs-large .wrap{transform:scale(1.15);transform-origin:top center}
+  }
+
+  section{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:16px 16px 18px;margin-bottom:16px;}
+  section h2{font-family:"Shippori Mincho","Noto Serif CJK JP",serif;font-weight:700;font-size:15px;
+    letter-spacing:.1em;color:var(--gold1);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  section h2 .tag{border:1px solid var(--gold2);border-radius:5px;font-size:11px;padding:2px 8px;color:var(--gold1);letter-spacing:.15em}
+  .hint{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0}
+
+  /* 解答欄 */
+  .qrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(38,49,79,.6)}
+  .qrow:last-child{border-bottom:none}
+  .qrow .ql{width:96px;flex:0 0 auto}
+  .qrow .ql .qn{font-family:"Shippori Mincho",serif;font-weight:700;font-size:14px;color:#fff}
+  .qrow .ql .yt{font-size:10px;color:var(--muted)}
+  .qrow input.ans{flex:1;background:#0b1226;border:1px solid var(--line);border-radius:8px;color:#fff;
+    padding:9px 12px;font-size:15px;font-family:"Shippori Mincho",serif;min-width:0}
+  .qrow input.ans:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 0 2px rgba(201,154,47,.25)}
+  .qrow .who{font-size:10px;color:var(--muted);max-width:90px;flex:0 0 auto;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* 換字表 */
+  .subst{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
+  .cbox{border:1px solid var(--line);border-radius:8px;overflow:hidden;text-align:center;background:#0b1226}
+  .cbox .al{font-family:"Shippori Mincho",serif;font-weight:700;font-size:13px;color:var(--gold1);
+    border-bottom:1px solid var(--line);padding:3px 0;background:rgba(201,154,47,.08)}
+  .cbox input{width:100%;border:none;background:transparent;color:#fff;text-align:center;
+    font-size:16px;padding:6px 0;font-family:"Shippori Mincho",serif}
+  .cbox input:focus{outline:none;background:rgba(201,154,47,.12)}
+
+  /* 進捗チェック */
+  .checks{display:flex;flex-direction:column;gap:8px}
+  .chk{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0b1226;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+  .chk .box{width:22px;height:22px;border:1.6px solid var(--muted);border-radius:6px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;transition:.15s}
+  .chk.on .box{background:var(--ok);border-color:var(--ok);color:#08210c}
+  .chk .lb{font-size:14px}
+  .chk.on .lb{color:var(--muted);text-decoration:line-through}
+  .chk .who{margin-left:auto;font-size:10px;color:var(--muted)}
+
+  /* メモボード */
+  .memo textarea{width:100%;height:180px;background:#0b1226;border:1px solid var(--line);border-radius:10px;
+    color:#fff;padding:12px;font-size:14px;line-height:1.7;font-family:inherit;resize:vertical}
+  .memo textarea:focus{outline:none;border-color:var(--gold2)}
+  .memo .foot{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted)}
+
+  .save-flash{color:var(--ok);opacity:0;transition:opacity .3s}
+  .save-flash.on{opacity:1}
+
+  footer{text-align:center;font-size:10px;color:var(--muted);letter-spacing:.4em;margin-top:20px}
+
+  /* セットアップ未完了バナー */
+  .setup{background:rgba(201,154,47,.1);border:1px solid var(--gold2);border-radius:10px;
+    padding:12px 14px;font-size:12px;color:var(--gold1);line-height:1.7;margin-bottom:16px}
+  .setup b{color:#fff}
+
+  /* BGMボタン */
+  .bgm-btn{position:fixed;top:10px;right:10px;z-index:10001;
+    background:rgba(20,28,52,.9);border:1px solid var(--gold2);border-radius:20px;
+    color:var(--gold1);font-family:inherit;font-size:12px;font-weight:700;
+    padding:7px 12px;cursor:pointer;backdrop-filter:blur(4px);box-shadow:0 2px 10px rgba(0,0,0,.4)}
+  .bgm-btn:active{transform:translateY(1px)}
+  .bgm-btn.off{color:var(--muted);border-color:var(--line)}
+
+  /* 各問ブロック */
+  .qblock{padding:8px 0;border-bottom:1px solid rgba(38,49,79,.6)}
+  .qblock:last-child{border-bottom:none}
+  .qblock .qrow{border-bottom:none;padding:0 0 6px}
+  .qmemo{width:100%;background:#0b1226;border:1px dashed var(--line);border-radius:8px;color:var(--muted);
+    padding:7px 10px;font-size:12.5px;font-family:inherit;resize:vertical;line-height:1.6;min-height:88px}
+  .qmemo:focus{outline:none;border-color:var(--gold2);color:#fff;border-style:solid}
+  .who.wide{max-width:none;width:auto;text-align:left;overflow:visible;white-space:normal;
+    font-size:10px;color:var(--muted);margin:2px 0 6px 4px;min-height:12px}
+
+  /* チャット */
+  .chat-log{height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+    padding:10px;background:#0b1226;border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+  .msg{font-size:13.5px;line-height:1.5}
+  .msg .nm{color:var(--gold1);font-weight:700;font-size:12px;margin-right:6px}
+  .msg .tx{color:var(--paper);word-break:break-word}
+  .msg.mine .nm{color:var(--ok)}
+  .chat-empty{color:var(--muted);font-size:12px;text-align:center;margin:auto}
+  .chat-input{display:flex;gap:8px}
+  .chat-input input{flex:1;background:#0b1226;border:1px solid var(--line);border-radius:8px;color:#fff;
+    padding:10px 12px;font-size:14px;font-family:inherit;min-width:0}
+  .chat-input input:focus{outline:none;border-color:var(--gold2)}
+  .chat-input button{background:linear-gradient(180deg,var(--gold1),var(--gold2));border:none;border-radius:8px;
+    color:#3a2c00;font-weight:700;padding:0 16px;font-size:14px;font-family:inherit;cursor:pointer;white-space:nowrap}
+  .chat-input button:active{transform:translateY(1px)}
+  .chat-note{font-size:10px;color:var(--muted);margin-top:6px;text-align:center}
+
+  /* メッセージ拡張 */
+  .msg{position:relative;padding-right:6px}
+  .msg-head .tx.del,.msg .tx.del{color:var(--muted);font-style:italic}
+  .msg-tools{display:flex;gap:6px;margin-top:4px}
+  .msg:not(.mine) .msg-tools .tbtn.own{display:none}
+  .tbtn{background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:7px;
+    font-size:14px;padding:3px 9px;cursor:pointer;line-height:1.4}
+  .tbtn:active{transform:translateY(1px);background:rgba(201,154,47,.2)}
+  .edit-box{display:flex;gap:5px;margin-top:5px;align-items:center}
+  .edit-inp{flex:1;background:#0b1226;border:1px solid var(--gold2);border-radius:7px;color:#fff;
+    padding:6px 9px;font-size:14px;font-family:inherit;min-width:0}
+  .edit-inp:focus{outline:none}
+  .del-confirm{display:flex;gap:6px;align-items:center;margin-top:5px;font-size:12px;color:var(--muted)}
+  .reacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+  .rchip{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:20px;
+    font-size:12px;padding:1px 8px;cursor:pointer;color:var(--paper)}
+  .rchip.on{background:rgba(201,154,47,.22);border-color:var(--gold2)}
+  .react-picker{position:fixed;z-index:10000;display:flex;gap:2px;background:#141c34;
+    border:1px solid var(--gold2);border-radius:10px;padding:5px 7px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .react-picker button{background:none;border:none;font-size:20px;cursor:pointer;padding:2px 4px}
+
+  /* 送信欄の絵文字ボタン/パネル */
+  #emojiToggle{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;
+    font-size:18px;padding:0 10px;cursor:pointer}
+  .emoji-panel{display:none;flex-wrap:wrap;gap:4px;margin-top:8px;padding:8px;
+    background:#0b1226;border:1px solid var(--line);border-radius:10px}
+  .emoji-panel.open{display:flex}
+  .emoji-panel button{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:8px;
+    font-size:20px;padding:4px 6px;cursor:pointer;line-height:1}
+  .emoji-panel button:active{transform:translateY(1px)}
+
+  /* 弾幕(画面全体) */
+  #danmaku{position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden}
+  .bullet{position:absolute;white-space:nowrap;font-weight:700;font-size:22px;
+    font-family:"Zen Kaku Gothic New",sans-serif;
+    text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.6);
+    will-change:transform;pointer-events:none}
+  @keyframes flyacross{from{transform:translateX(100vw)}to{transform:translateX(-110%)}}
+  /* ===== オープニング演出 ===== */
+  #opening,.opening{position:fixed;inset:0;z-index:20000;overflow:hidden;
+    background:radial-gradient(120% 70% at 50% -10%,#16204a 0%,#0a1024 46%,#060a18 84%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    transition:opacity .8s ease}
+  #opening.hide{opacity:0;pointer-events:none}
+  .op-stars{position:absolute;inset:0}
+  .op-stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.6;
+    box-shadow:0 0 4px 1px rgba(255,255,255,.5);animation:optw 4s ease-in-out infinite}
+  @keyframes optw{0%,100%{opacity:.15}50%{opacity:.85}}
+  .op-garland{position:absolute;top:0;left:0;right:0;height:90px}
+  .op-garland svg{width:100%;height:90px}
+  .op-lanterns{position:absolute;top:0;left:0;right:0;height:130px}
+  .op-lantern{position:absolute;top:14px;transform-origin:top center;
+    opacity:0;animation:oplight .5s ease forwards, opsway 3.4s ease-in-out infinite}
+  /* 吊り紐 */
+  .op-lantern .cord{position:absolute;left:50%;top:-14px;width:1.5px;height:14px;
+    background:#4a4030;transform:translateX(-50%)}
+  /* 上下の口金 */
+  .op-lantern .cap{position:absolute;left:50%;transform:translateX(-50%);
+    width:16px;height:6px;background:linear-gradient(#3a2a1a,#241a10);border-radius:2px;z-index:3}
+  .op-lantern .cap.top{top:0}
+  .op-lantern .cap.bot{bottom:14px}
+  /* 提灯本体(縦長楕円) */
+  .op-lantern .globe{position:absolute;left:50%;top:5px;transform:translateX(-50%);
+    width:40px;height:52px;border-radius:50%;
+    background:
+      radial-gradient(circle at 42% 40%, #ff6a4d 0%, #ef4423 42%, #c92d17 78%, #a81f0e 100%);
+    overflow:hidden;transition:filter .6s ease, box-shadow .6s ease;
+    filter:brightness(.5) saturate(.85)}         /* 消灯 */
+  /* リブ(横の節) */
+  .op-lantern .globe::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:repeating-linear-gradient(0deg,
+      rgba(0,0,0,.16) 0 1px, transparent 1px 9px)}
+  /* 点灯時の中心光 */
+  .op-lantern .globe::after{content:"";position:absolute;left:50%;top:50%;
+    width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle,#fff3c0 0%,rgba(255,200,120,.6) 40%,rgba(255,150,80,0) 72%);
+    opacity:0;transition:opacity .6s ease}
+  /* 房(タッセル) */
+  .op-lantern .tassel{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);
+    width:1.5px;height:12px;background:#d9a621}
+  .op-lantern .tassel::after{content:"";position:absolute;left:50%;bottom:-3px;width:4px;height:4px;
+    transform:translateX(-50%);border-radius:50%;background:#f0c040}
+  /* 点灯状態 */
+  .op-lantern.lit .globe{filter:brightness(1.12) saturate(1.1);
+    box-shadow:0 0 26px 8px rgba(255,90,50,.55),0 0 60px 18px rgba(224,85,60,.28)}
+  .op-lantern.lit .globe::after{opacity:1}
+  @keyframes oplight{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  @keyframes opsway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+  .op-center{position:relative;z-index:2;text-align:center;padding:20px 30px;opacity:0;
+    animation:opfade 1s ease .9s forwards}
+  @keyframes opfade{to{opacity:1}}
+  .op-en,.op-eyebrow{font-family:"Shippori Mincho","Noto Serif CJK JP",serif;letter-spacing:.5em;
+    font-size:12px;color:var(--gold1);margin-left:.5em;margin-bottom:14px}
+  .op-title{font-family:"Shippori Mincho","Noto Serif CJK JP",serif;font-weight:800;
+    font-size:38px;letter-spacing:.18em;color:#fff;text-shadow:0 0 26px rgba(244,214,122,.4)}
+  .op-sub{font-family:"Shippori Mincho","Noto Serif CJK JP",serif;font-size:13px;color:var(--muted);
+    letter-spacing:.25em;margin-top:12px}
+  .op-start{margin-top:34px;background:linear-gradient(180deg,var(--gold1),var(--gold2));border:none;
+    border-radius:30px;color:#3a2c00;font-family:"Shippori Mincho",serif;font-weight:800;font-size:17px;
+    letter-spacing:.15em;padding:13px 40px;cursor:pointer;box-shadow:0 6px 20px rgba(233,196,106,.3);
+    animation:oppulse 2s ease-in-out infinite}
+  .op-start:active{transform:translateY(1px)}
+  @keyframes oppulse{0%,100%{box-shadow:0 6px 20px rgba(233,196,106,.3)}50%{box-shadow:0 6px 30px rgba(233,196,106,.6)}}
+  .op-hint{margin-top:18px;font-size:11px;color:rgba(244,236,218,.6);letter-spacing:.1em}
+</style>
+</head>
+<body>
+<!-- BGM(同じ場所の bgm.mp3 を再生。スマホは初回タップで開始) -->
+<audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
+<button id="bgmBtn" class="bgm-btn" title="BGM">🎵 音楽ON</button>
+
+<!-- オープニング演出(毎回) -->
+<div id="opening" class="opening">
+  <div class="op-stars" id="opStars"></div>
+  <div class="op-center">
+    <div class="op-eyebrow">Y A T A I ・ N A Z O T O K I</div>
+    <h1 class="op-title">共 有 ボ ー ド</h1>
+    <div class="op-sub" style="color:#e08a7a">【 テスト用 】</div>
+    <div class="op-sub">― みんなで解く、屋台の謎 ―</div>
+    <button id="opStart" class="op-start">解きはじめる</button>
+    <div class="op-hint">タップで音・BGMが再生されます 🔊</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="en">Y A T A I ・ N A Z O T O K I</div>
+    <h1>共 有 ボ ー ド <span style="font-size:13px;color:#c0563e;border:1px solid #c0563e;border-radius:6px;padding:2px 8px;vertical-align:middle;letter-spacing:.1em">TEST</span></h1>
+    <div class="sub">― テスト用（本番とは別部屋）―</div>
+  </header>
+
+  <div class="status local" id="status"><span class="dot"></span><span id="statusText">接続確認中…</span></div>
+
+  <div class="setup" id="setupBanner" style="display:none">
+    ⚠ まだ <b>ローカルモード</b>（自分だけ表示）です。全員で同期するには、下部の手順に沿って Firebase 設定を貼り付けてください。
+  </div>
+
+  <div class="whoami">
+    <label>あなたの名前</label>
+    <input id="name" placeholder="例：たろう" maxlength="12">
+    <input id="color" type="color" value="#f4d67a" title="自分の色">
+  </div>
+
+  <!-- ツールバー(文字サイズ) -->
+  <div class="toolbar">
+    <span class="tb-label">文字サイズ</span>
+    <button class="tb-btn" data-fs="small">小</button>
+    <button class="tb-btn" data-fs="normal">中</button>
+    <button class="tb-btn" data-fs="large">大</button>
+  </div>
+
+  <!-- 参加者リスト -->
+  <div class="participants" id="participants">
+    <span class="p-title">いま参加中</span>
+    <span class="p-list" id="pList"><span class="p-none">—</span></span>
+  </div>
+
+  <!-- 解答欄 -->
+  <section>
+    <h2><span class="tag">解 答</span>各問の答え <span class="hint">打ち込むと全員に共有</span></h2>
+    <div id="qlist"></div>
+  </section>
+
+  <!-- 換字表 -->
+  <section>
+    <h2><span class="tag">換字表</span>A〜Q → ひらがな</h2>
+    <div class="subst" id="subst"></div>
+  </section>
+
+  <!-- 進捗チェック -->
+  <section>
+    <h2><span class="tag">進 捗</span>解けた問題にチェック</h2>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+      <div class="progress-txt" id="progTxt">0 / 7 問クリア</div>
+    </div>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <!-- メモボード -->
+  <section class="memo">
+    <h2><span class="tag">メ モ</span>みんなの書き込み <span class="hint">自由に使ってOK</span></h2>
+    <textarea id="memo" placeholder="気づいたこと・ひらめき・怪しい箇所を書き込もう…"></textarea>
+    <div class="foot"><span id="memoWho">　</span><span class="save-flash" id="flash">保存しました</span></div>
+  </section>
+
+  <!-- チャット -->
+  <section>
+    <h2><span class="tag">チャット</span>みんなで会話 <span class="hint">打つと画面に流れる</span></h2>
+    <div class="chat-log" id="chatLog"><div class="chat-empty">まだメッセージはありません</div></div>
+    <div class="chat-input">
+      <button id="emojiToggle" title="絵文字">😀</button>
+      <input id="chatText" placeholder="メッセージ…" maxlength="60">
+      <button id="chatSend">送信</button>
+    </div>
+    <div class="emoji-panel" id="emojiPanel"></div>
+    <div class="chat-note">送信すると、全員の画面をコメントが流れます 🎏</div>
+  </section>
+
+  <footer>Y A T A I&nbsp;&nbsp;N A Z O T O K I</footer>
+</div>
+
+<!-- 弾幕レイヤー(画面全体) -->
+<div id="danmaku"></div>
+
+<!-- ============================================================= -->
+<!--  ▼▼▼ ここだけ書き換える：Firebase 設定 ▼▼▼                     -->
+<!--  手順書（別ファイル）の通りに、コンソールでコピーした            -->
+<!--  firebaseConfig の中身を下に貼り付けてください。                -->
+<!--  貼り付けない場合は「ローカルモード（自分だけ）」で動きます。     -->
+<!-- ============================================================= -->
+<script>
+  const firebaseConfig = {
+    apiKey: "",
+    authDomain: "",
+    databaseURL: "",   // ← Realtime Database のURL。これが空だとローカルモード
+    projectId: "",
+    appId: ""
+  };
+  // 合言葉（部屋名）。同じ文字列にした人同士だけが同期します。変えてもOK。
+  const ROOM = "test-room";  // ← テスト専用の部屋。本番(himawari-2025)とは混ざりません
+</script>
+<!-- ============================================================= -->
+<!--  ▲▲▲ 書き換えるのはここまで ▲▲▲                                -->
+<!-- ============================================================= -->
+
+<script>
+  /* ---------- データ定義 ---------- */
+  const QUESTIONS=[
+    ["Q1","射的"],["Q2","金魚すくい"],["Q3","お面屋"],["Q4","たこ焼き"],
+    ["Q5","かき氷"],["Q6","型抜き"],["Q7","最後の問い"]
+  ];
+  const ALPHA="ABCDEFGHIJKLMNOPQ".split("");
+
+  /* ---------- 要素生成 ---------- */
+  const qlist=document.getElementById('qlist');
+  QUESTIONS.forEach(([qn,yt],i)=>{
+    const block=document.createElement('div');block.className='qblock';
+    block.innerHTML=`
+      <div class="qrow">
+        <div class="ql"><div class="qn">${qn}</div><div class="yt">${yt}</div></div>
+        <input class="ans" data-key="ans_${i}" placeholder="答えを入力…">
+      </div>
+      <div class="who wide" data-who="ans_${i}"></div>
+      <textarea class="qmemo" data-key="qmemo_${i}" placeholder="この問題のメモ（気づき・作業）…" rows="4"></textarea>`;
+    qlist.appendChild(block);
+  });
+  const subst=document.getElementById('subst');
+  ALPHA.forEach(a=>{
+    const b=document.createElement('div');b.className='cbox';
+    b.innerHTML=`<div class="al">${a}</div><input data-key="sub_${a}" maxlength="2" inputmode="kana">`;
+    subst.appendChild(b);
+  });
+  const checks=document.getElementById('checks');
+  QUESTIONS.forEach(([qn,yt],i)=>{
+    const c=document.createElement('div');c.className='chk';c.dataset.key=`chk_${i}`;
+    c.innerHTML=`<div class="box">✓</div><div class="lb">${qn}　${yt}</div><div class="who" data-who="chk_${i}"></div>`;
+    checks.appendChild(c);
+  });
+
+  /* ---------- 状態 ---------- */
+  const state={};                 // key -> value
+  const meta={};                  // key -> 最終更新者
+  let myName=localStorage.getItem('nazo_name')||'';
+  const nameInput=document.getElementById('name');
+  nameInput.value=myName;
+  nameInput.addEventListener('input',()=>{myName=nameInput.value.trim();localStorage.setItem('nazo_name',myName);pushPresence();});
+
+  // 自分の色
+  let myColor=localStorage.getItem('nazo_color')||'#f4d67a';
+  const colorInput=document.getElementById('color');
+  colorInput.value=myColor;
+  colorInput.addEventListener('input',()=>{myColor=colorInput.value;localStorage.setItem('nazo_color',myColor);pushPresence();renderChat&&renderChat();});
+
+  // 文字サイズ
+  const savedFs=localStorage.getItem('nazo_fs')||'normal';
+  function setFs(fs){document.body.classList.remove('fs-small','fs-normal','fs-large');document.body.classList.add('fs-'+fs);
+    localStorage.setItem('nazo_fs',fs);
+    document.querySelectorAll('.tb-btn').forEach(b=>b.classList.toggle('on',b.dataset.fs===fs));}
+  document.querySelectorAll('.tb-btn').forEach(b=>b.addEventListener('click',()=>setFs(b.dataset.fs)));
+  setFs(savedFs);
+
+  /* ---------- 効果音(合成・著作権フリー) ---------- */
+  const SFX=(()=>{
+    let ctx,master;
+    function ac(){if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=0.6;master.connect(ctx.destination);}if(ctx.state==='suspended')ctx.resume();return ctx;}
+    function tone(f,d,type='sine',v=0.3,to=null,delay=0){const c=ac(),t=c.currentTime+delay;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+d);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(master);o.start(t);o.stop(t+d+0.05);}
+    function noise(len){const c=ac();const b=c.createBuffer(1,c.sampleRate*len,c.sampleRate);const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;}
+    return {
+      tsuzumi(){ // 鼓(チェック時)
+        tone(210,0.22,'sine',0.5,150);tone(320,0.12,'triangle',0.2,240);
+        const c=ac(),t=c.currentTime;const s=c.createBufferSource();s.buffer=noise(0.05);
+        const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=800;
+        const g=c.createGain();g.gain.setValueAtTime(0.22,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.06);
+        s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+0.08);
+      },
+      suzu(){ [1760,2093,2637].forEach((fr,i)=>tone(fr,0.4,'triangle',0.1,fr*0.98,i*0.03)); }, // 鈴(送信時)
+      fanfare(){ [523,659,784,1047].forEach((fr,i)=>tone(fr,0.5,'triangle',0.22,null,i*0.09)); } // 全問クリア
+    };
+  })();
+
+  /* ---------- 同期バックエンド ---------- */
+  let backend=null;      // firebase ref
+  const statusEl=document.getElementById('status');
+  const statusText=document.getElementById('statusText');
+  const setupBanner=document.getElementById('setupBanner');
+
+  function setStatus(mode,text){
+    statusEl.className='status '+mode;statusText.textContent=text;
+    setupBanner.style.display = (mode==='local' || mode==='localsaved') ? 'block' : 'none';
+  }
+
+  // ローカル保存(オフライン/未設定時)
+  const LS='nazo_board_'+ROOM;
+  function loadLocal(){try{const o=JSON.parse(localStorage.getItem(LS)||'{}');Object.assign(state,o.state||{});Object.assign(meta,o.meta||{});}catch(e){}}
+  function saveLocal(){localStorage.setItem(LS,JSON.stringify({state,meta}));}
+
+  /* ---------- 反映(データ→画面) ---------- */
+  function render(){
+    document.querySelectorAll('[data-key]').forEach(el=>{
+      const k=el.dataset.key;
+      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){
+        if(document.activeElement!==el){ el.value=state[k]||''; }
+      }
+    });
+    // メモ
+    const memo=document.getElementById('memo');
+    if(document.activeElement!==memo){ memo.value=state['memo']||''; }
+    // チェック
+    let done=0;
+    QUESTIONS.forEach((_,i)=>{
+      const c=document.querySelector(`.chk[data-key="chk_${i}"]`);
+      const on=!!state[`chk_${i}`];
+      if(c) c.classList.toggle('on', on);
+      if(on) done++;
+    });
+    // 進捗バー
+    const pf=document.getElementById('progFill'), ptx=document.getElementById('progTxt');
+    if(pf){ pf.style.width=(done/QUESTIONS.length*100)+'%'; }
+    if(ptx){ ptx.textContent=`${done} / ${QUESTIONS.length} 問クリア`+(done===QUESTIONS.length?'　🎉全問達成！':''); }
+    // 全問クリアの瞬間(初回のみ)演出
+    if(done===QUESTIONS.length && !allClearedShown){ allClearedShown=true; celebrate(); }
+    if(done<QUESTIONS.length) allClearedShown=false;
+    // 更新者ラベル
+    document.querySelectorAll('[data-who]').forEach(el=>{
+      const w=meta[el.dataset.who]; el.textContent = w?('by '+w):'';
+    });
+  }
+  let allClearedShown=false;
+  function celebrate(){
+    try{SFX.fanfare();}catch(e){}
+    // 画面いっぱいに弾幕的な祝福
+    ['🎉','🌻','✨','🎊','🌻','🎉'].forEach((e,i)=>setTimeout(()=>fireDanmaku(e+' 全問クリア！ '+e,''),i*180));
+  }
+
+  /* ---------- 書き込み(画面→データ) ---------- */
+  function push(key,val){
+    state[key]=val;
+    if(myName) meta[key]=myName;
+    if(backend){
+      const upd={};upd[`state/${key}`]=val; if(myName) upd[`meta/${key}`]=myName;
+      backend.update(upd);
+    }else{
+      saveLocal(); flashSaved();
+    }
+  }
+  let flashT;
+  function flashSaved(){const f=document.getElementById('flash');f.classList.add('on');clearTimeout(flashT);flashT=setTimeout(()=>f.classList.remove('on'),900);}
+
+  // 入力イベント
+  document.querySelectorAll('input.ans, .cbox input, .qmemo').forEach(el=>{
+    el.addEventListener('input',()=>push(el.dataset.key, el.value));
+  });
+  document.getElementById('memo').addEventListener('input',e=>push('memo', e.target.value));
+  document.querySelectorAll('.chk').forEach(c=>{
+    c.addEventListener('click',()=>{const k=c.dataset.key;const turningOn=!state[k];push(k, state[k]?'' : '1');if(turningOn){try{SFX.tsuzumi();}catch(e){}}render();});
+  });
+
+  /* ---------- Firebase 接続 ---------- */
+  function initFirebase(){
+    if(!firebaseConfig.databaseURL){  // 未設定 → ローカルモード
+      loadLocal();render();loadLocalChat();setStatus('local','ローカルモード（自分だけ）');return;
+    }
+    const s1=document.createElement('script');
+    s1.src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js";
+    s1.onload=()=>{
+      const s2=document.createElement('script');
+      s2.src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js";
+      s2.onload=connect; s2.onerror=fallback; document.head.appendChild(s2);
+    };
+    s1.onerror=fallback; document.head.appendChild(s1);
+  }
+  function fallback(){loadLocal();render();loadLocalChat();setStatus('local','オフライン（自分だけ）');}
+  function connect(){
+    try{
+      firebase.initializeApp(firebaseConfig);
+      const db=firebase.database();
+      backend=db.ref('rooms/'+ROOM);
+      backend.child('state').on('value',snap=>{Object.assign(state,snap.val()||{});render();});
+      backend.child('meta').on('value',snap=>{Object.assign(meta,snap.val()||{});render();});
+      // チャット(キー付き。追加/変更/削除を購読)
+      chatRef=backend.child('chat');
+      const q=chatRef.limitToLast(100);
+      q.on('child_added',snap=>{
+        const m=snap.val(); if(!m) return; m.id=snap.key;
+        upsertMsg(m);
+        if(chatReady && Date.now()-(m.t||0) < 15000 && !m.deleted) fireDanmaku(m.text, m.name, m.color);
+      });
+      q.on('child_changed',snap=>{const m=snap.val();if(!m)return;m.id=snap.key;upsertMsg(m);});
+      q.on('child_removed',snap=>{removeMsg(snap.key);});
+      chatRef.once('value',()=>{ chatReady=true; });
+      // 接続状態
+      db.ref('.info/connected').on('value',s=>{
+        if(s.val()===true){ setStatus('online','全員と同期中'); setupPresence(db); }
+        else setStatus('local','再接続中…');
+      });
+    }catch(e){fallback();}
+  }
+
+  /* ---------- 参加者(presence) ---------- */
+  let presenceRef=null;
+  function setupPresence(db){
+    presenceRef=backend.child('presence').child(myUid);
+    presenceRef.onDisconnect().remove();  // 接続が切れたら自動で消える
+    pushPresence();
+    backend.child('presence').on('value',snap=>{
+      const p=snap.val()||{}; renderParticipants(p);
+    });
+  }
+  function pushPresence(){
+    if(presenceRef){ presenceRef.set({name:(myName||'名無し'), color:myColor, t:Date.now()}); }
+  }
+  function renderParticipants(p){
+    const list=document.getElementById('pList');
+    const arr=Object.values(p);
+    if(arr.length===0){ list.innerHTML='<span class="p-none">—</span>'; return; }
+    list.innerHTML='';
+    arr.sort((a,b)=>(a.t||0)-(b.t||0)).forEach(u=>{
+      const chip=document.createElement('span');chip.className='p-chip';
+      const dot=document.createElement('span');dot.className='pdot';dot.style.background=u.color||'#f4d67a';
+      const nm=document.createElement('span');nm.textContent=u.name||'名無し';
+      chip.appendChild(dot);chip.appendChild(nm);list.appendChild(chip);
+    });
+  }
+
+  /* ---------- チャット ---------- */
+  let chatRef=null, chatReady=false;
+  const chatLog=document.getElementById('chatLog');
+  const chatText=document.getElementById('chatText');
+  const LSC='nazo_chat_'+ROOM;
+  // 自分の匿名ID(端末に保存。編集/削除の本人判定に使う)
+  let myUid=localStorage.getItem('nazo_uid');
+  if(!myUid){ myUid='u'+Math.random().toString(36).slice(2,10); localStorage.setItem('nazo_uid',myUid); }
+
+  const REACTIONS=['👍','😆','🔥','😮','🎉','❤️'];
+  const msgs={};        // id -> message object
+
+  function localSaveChat(){
+    try{ localStorage.setItem(LSC, JSON.stringify(Object.values(msgs).slice(-100))); }catch(e){}
+  }
+  function upsertMsg(m){ msgs[m.id]=m; renderChat(); if(!chatRef) localSaveChat(); }
+  function removeMsg(id){ delete msgs[id]; renderChat(); if(!chatRef) localSaveChat(); }
+
+  function renderChat(){
+    const list=Object.values(msgs).sort((a,b)=>(a.t||0)-(b.t||0));
+    if(list.length===0){ chatLog.innerHTML='<div class="chat-empty">まだメッセージはありません</div>'; return; }
+    chatLog.innerHTML='';
+    list.forEach(m=>{
+      const d=document.createElement('div');
+      d.className='msg'+(m.uid===myUid?' mine':'');
+      if(m.deleted){
+        d.innerHTML=`<span class="nm"></span><span class="tx del">（削除されました）</span>`;
+        d.querySelector('.nm').textContent=(m.name||'名無し')+'：';
+        chatLog.appendChild(d); return;
+      }
+      // 本体
+      const head=document.createElement('div');head.className='msg-head';
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=(m.name||'名無し')+'：';
+      if(m.color) nm.style.color=m.color;
+      const tx=document.createElement('span');tx.className='tx';tx.textContent=m.text + (m.edited?' (編集済)':'');
+      head.appendChild(nm);head.appendChild(tx);
+      d.appendChild(head);
+      // リアクション表示
+      const rc=document.createElement('div');rc.className='reacts';
+      const rmap=m.reactions||{};
+      REACTIONS.forEach(e=>{
+        const users=rmap[e]?Object.keys(rmap[e]):[];
+        if(users.length>0){
+          const chip=document.createElement('button');
+          chip.className='rchip'+(rmap[e]&&rmap[e][myUid]?' on':'');
+          chip.textContent=e+' '+users.length;
+          chip.onclick=()=>toggleReaction(m.id,e);
+          rc.appendChild(chip);
+        }
+      });
+      d.appendChild(rc);
+      // 操作ツール
+      const tools=document.createElement('div');tools.className='msg-tools';
+      const react=document.createElement('button');react.className='tbtn';react.textContent='😀';
+      react.title='リアクション';react.onclick=(ev)=>{ev.stopPropagation();openReactPicker(m.id,react);};
+      tools.appendChild(react);
+      if(m.uid===myUid){
+        const edit=document.createElement('button');edit.className='tbtn own';edit.textContent='✏️ 編集';
+        edit.onclick=(ev)=>{ev.stopPropagation();startEdit(m,d);};
+        const del=document.createElement('button');del.className='tbtn own';del.textContent='🗑 削除';
+        del.onclick=(ev)=>{ev.stopPropagation();delMsg(m.id,d);};
+        tools.appendChild(edit);tools.appendChild(del);
+      }
+      d.appendChild(tools);
+      chatLog.appendChild(d);
+    });
+    chatLog.scrollTop=chatLog.scrollHeight;
+  }
+
+  function loadLocalChat(){
+    try{(JSON.parse(localStorage.getItem(LSC)||'[]')).forEach(m=>{msgs[m.id||('l'+m.t)]=m;});}catch(e){}
+    renderChat(); chatReady=true;
+  }
+
+  function sendChat(){
+    const t=chatText.value.trim(); if(!t) return;
+    const m={name:(myName||'名無し'), text:t, t:Date.now(), uid:myUid, color:myColor};
+    chatText.value='';
+    try{SFX.suzu();}catch(e){}
+    if(chatRef){ const ref=chatRef.push(); m.id=ref.key; ref.set(m); }
+    else{ m.id='l'+m.t; upsertMsg(m); fireDanmaku(m.text,m.name,m.color); }
+  }
+  // 編集:メッセージ内にインライン入力欄を出す(prompt非依存で確実)
+  function startEdit(m,rowEl){
+    if(rowEl.querySelector('.edit-box')) return;
+    const box=document.createElement('div');box.className='edit-box';
+    const ta=document.createElement('input');ta.type='text';ta.value=m.text;ta.maxLength=60;ta.className='edit-inp';
+    const ok=document.createElement('button');ok.className='tbtn';ok.textContent='保存';
+    const ng=document.createElement('button');ng.className='tbtn';ng.textContent='取消';
+    box.appendChild(ta);box.appendChild(ok);box.appendChild(ng);
+    rowEl.appendChild(box);ta.focus();
+    const commit=()=>{
+      const v=ta.value.trim();
+      if(!v){ box.remove(); return; }
+      if(chatRef){ chatRef.child(m.id).update({text:v, edited:true}); }
+      else{ m.text=v; m.edited=true; upsertMsg(m); }
+    };
+    ok.onclick=commit;
+    ta.addEventListener('keydown',e=>{if(e.key==='Enter')commit();});
+    ng.onclick=()=>box.remove();
+  }
+  // 削除:確認ボタンをその場に出す(confirm非依存)
+  function delMsg(id,rowEl){
+    if(rowEl && rowEl.querySelector('.del-confirm')) return;
+    const bar=document.createElement('div');bar.className='del-confirm';
+    bar.innerHTML='<span>削除しますか？</span>';
+    const yes=document.createElement('button');yes.className='tbtn';yes.textContent='はい';
+    const no=document.createElement('button');no.className='tbtn';no.textContent='やめる';
+    bar.appendChild(yes);bar.appendChild(no);
+    (rowEl||chatLog).appendChild(bar);
+    yes.onclick=()=>{
+      if(chatRef){ chatRef.child(id).update({deleted:true, text:''}); }
+      else{ msgs[id].deleted=true; upsertMsg(msgs[id]); }
+    };
+    no.onclick=()=>bar.remove();
+  }
+  function toggleReaction(id,e){
+    const m=msgs[id]; if(!m) return;
+    m.reactions=m.reactions||{}; m.reactions[e]=m.reactions[e]||{};
+    const on=!!m.reactions[e][myUid];
+    if(chatRef){
+      chatRef.child(id).child('reactions').child(e).child(myUid).set(on?null:true);
+    }else{
+      if(on) delete m.reactions[e][myUid]; else m.reactions[e][myUid]=true;
+      upsertMsg(m);
+    }
+  }
+  // リアクション絵文字ピッカー
+  let picker=null;
+  function openReactPicker(id,anchor){
+    closePicker();
+    picker=document.createElement('div');picker.className='react-picker';
+    REACTIONS.forEach(e=>{const b=document.createElement('button');b.textContent=e;
+      b.onclick=()=>{toggleReaction(id,e);closePicker();};picker.appendChild(b);});
+    document.body.appendChild(picker);
+    const r=anchor.getBoundingClientRect();
+    picker.style.left=Math.min(r.left, window.innerWidth-picker.offsetWidth-10)+'px';
+    picker.style.top=(r.top-46)+'px';
+    setTimeout(()=>document.addEventListener('click',closePicker,{once:true}),0);
+  }
+  function closePicker(){ if(picker){picker.remove();picker=null;} }
+
+  document.getElementById('chatSend').addEventListener('click',sendChat);
+  chatText.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat();}});
+
+  // 送信欄の絵文字パネル(ポンと押すと入力に挿入)
+  const emojiPanel=document.getElementById('emojiPanel');
+  ['😀','😆','😂','🥳','😮','😭','👍','🙏','🔥','🎉','❤️','✨','🌻','🏮','🎏','🍻','❓','💡'].forEach(e=>{
+    const b=document.createElement('button');b.type='button';b.textContent=e;
+    b.onclick=()=>{ chatText.value+=e; chatText.focus(); };
+    emojiPanel.appendChild(b);
+  });
+  document.getElementById('emojiToggle').addEventListener('click',()=>{
+    emojiPanel.classList.toggle('open');
+  });
+
+  /* ---------- 弾幕(ニコニコ風) ---------- */
+  const dmLayer=document.getElementById('danmaku');
+  const dmColors=['#ffffff','#f4d67a','#7fd0ff','#ff8fc7','#9be29b','#ffd27f'];
+  let dmLane=0;
+  function fireDanmaku(text,name,color){
+    const b=document.createElement('div');
+    b.className='bullet';
+    b.textContent=text;
+    const laneH=30; const lanes=Math.max(6, Math.floor(window.innerHeight*0.6/laneH));
+    dmLane=(dmLane+1)%lanes;
+    const top=40 + dmLane*laneH + Math.random()*8;
+    b.style.top=top+'px';
+    b.style.color=color||dmColors[Math.floor(Math.random()*dmColors.length)];
+    const dur=6 + Math.random()*3;
+    b.style.animation=`flyacross ${dur}s linear forwards`;
+    dmLayer.appendChild(b);
+    setTimeout(()=>b.remove(), dur*1000+200);
+  }
+
+  /* ---------- BGM ---------- */
+  const bgm=document.getElementById('bgm');
+  const bgmBtn=document.getElementById('bgmBtn');
+  let bgmWanted=true;   // ユーザーが鳴らしたい状態か
+  bgm.volume=0.45;
+
+  function updateBgmBtn(){
+    if(bgmWanted && !bgm.paused){ bgmBtn.textContent='🎵 音楽ON'; bgmBtn.classList.remove('off'); }
+    else{ bgmBtn.textContent='🔇 音楽OFF'; bgmBtn.classList.add('off'); }
+  }
+  function tryPlayBgm(){
+    if(!bgmWanted) return;
+    bgm.play().then(updateBgmBtn).catch(()=>{ /* 自動再生ブロック→初回タップ待ち */ });
+  }
+  // 開いてすぐ試す(PCや一部環境では鳴る)
+  tryPlayBgm();
+  // スマホ対策:最初の画面タップで開始
+  function firstTouch(){ tryPlayBgm(); document.removeEventListener('pointerdown',firstTouch); }
+  document.addEventListener('pointerdown',firstTouch);
+
+  // ボタンでON/OFF
+  bgmBtn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    if(bgm.paused){ bgmWanted=true; bgm.play().then(updateBgmBtn).catch(updateBgmBtn); }
+    else{ bgmWanted=false; bgm.pause(); updateBgmBtn(); }
+  });
+  bgm.addEventListener('play',updateBgmBtn);
+  bgm.addEventListener('pause',updateBgmBtn);
+  // ファイルが無い/読めない時はボタンを控えめに
+  bgm.addEventListener('error',()=>{ bgmBtn.textContent='🎵 (bgm.mp3 未設置)'; bgmBtn.classList.add('off'); });
+  updateBgmBtn();
+
+  /* ---------- オープニング演出 ---------- */
+  (function(){
+    const op=document.getElementById('opening');
+    if(!op) return;
+    // 星
+    const st=document.getElementById('opStars');
+    for(let i=0;i<70;i++){const s=document.createElement('i');
+      s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';
+      s.style.animationDelay=(Math.random()*4)+'s';st.appendChild(s);}
+    // 開始ボタン
+    document.getElementById('opStart').addEventListener('click',()=>{
+      try{ SFX.suzu(); }catch(e){}
+      // BGM解禁(存在すれば)
+      try{ if(typeof bgm!=='undefined'){ bgmWanted=true; bgm.play().then(()=>updateBgmBtn&&updateBgmBtn()).catch(()=>{}); } }catch(e){}
+      op.classList.add('hide');
+      setTimeout(()=>op.remove(),900);
+    });
+  })();
+
+  initFirebase();
+</script>
+</body>
+</html>
